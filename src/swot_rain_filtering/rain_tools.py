@@ -22,17 +22,20 @@ from matplotlib.colors import to_hex
 # ##################
 
 import matplotlib.font_manager as fm
-# Regular and bold font paths
-font_regular_path = "../.fonts/times/times.ttf"
-font_bold_path = "../.fonts/times/timesbd.ttf"  # Bold
-# Register both fonts
-fm.fontManager.addfont(font_regular_path)
-fm.fontManager.addfont(font_bold_path)
-# Create font properties
-font_regular = fm.FontProperties(fname=font_regular_path)
-font_bold = fm.FontProperties(fname=font_bold_path)
-# Set default font to regular Times New Roman
-plt.rcParams['font.family'] = font_regular.get_name()
+
+font_regular = None
+font_bold = None
+font_regular_path = Path(__file__).resolve().parents[3] / ".fonts" / "times" / "times.ttf"
+font_bold_path = Path(__file__).resolve().parents[3] / ".fonts" / "times" / "timesbd.ttf"
+try:
+    if font_regular_path.is_file() and font_bold_path.is_file():
+        fm.fontManager.addfont(str(font_regular_path))
+        fm.fontManager.addfont(str(font_bold_path))
+        font_regular = fm.FontProperties(fname=str(font_regular_path))
+        font_bold = fm.FontProperties(fname=str(font_bold_path))
+        plt.rcParams["font.family"] = font_regular.get_name()
+except Exception:
+    pass
 
 
 # ── IMERG ─────────────────────────────────────────────────────────────────────

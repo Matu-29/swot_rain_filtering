@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swot-rain-filtering"
+version = "0.1.0"
+description = "IMERG bulldozer + Matu fine-scale rain filtering for SWOT KaRIn SWH"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "xarray",
+  "scipy",
+  "pandas",
+  "matplotlib",
+  "cartopy",
+  "netCDF4",
+  "tqdm",
+  "pyproj",
+  "shapely",
+  "pyshp",
+]
+
+[project.optional-dependencies]
+dev = ["jupyter", "ipykernel"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
