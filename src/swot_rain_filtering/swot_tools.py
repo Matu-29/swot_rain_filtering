@@ -298,7 +298,7 @@ def find_cycle_and_pass_from_L2_LR_SSH(ds_swot=None, swot_path=None):
     return cycle, n_pass
 
 
-def add_swot_path_to_ines_cases_locations(df_locations=pd.read_csv(r"/home1/datahome/msimonne/CDD/Projects/Rain/data/ines_swot_cases_location.csv")):
+def add_swot_path_to_ines_cases_locations(df_locations=pd.read_csv(r"/home1/datahome/ilarroch/data/INES/CODE/swot_rain_filtering/ines_swot_cases.csv")):
     selected_swot_paths_list = []
     
     for i in range(len(df_locations)):

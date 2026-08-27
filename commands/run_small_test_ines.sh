@@ -24,5 +24,6 @@ python "$ROOT/commands/run_filter.py" \
   --kernel-size-nan 1 \
   --step-to-crop-at-edges 0 \
   --untrustable-hs 40.0 \
+  --max-files 1 \
   "$@"
 
