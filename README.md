@@ -104,6 +104,5 @@ Set these in the bash launchers (or pass them to `run_filter.py`):
 
 ## Authors / context
 
-Original SWOT/IMERG tooling by Matu; batch IMERG + Matu
-filtering workflow extended for production runs via `commands/`.
+Original code: Matu
 

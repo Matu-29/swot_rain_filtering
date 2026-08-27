@@ -1,0 +1,11 @@
+numpy
+xarray
+scipy
+pandas
+matplotlib
+cartopy
+netCDF4
+tqdm
+pyproj
+shapely
+pyshp
