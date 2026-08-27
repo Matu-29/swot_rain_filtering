@@ -9,9 +9,9 @@ OUTPUT_DIR="/home/datawork-WW3/PROJECT/AMPHITRITE/SWOT_RAIN_FILTERED/"
 
 # Avoid matplotlib error (Ines env)
 
-source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate seastatesenv
-export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
+# source "$(conda info --base)/etc/profile.d/conda.sh"
+# conda activate seastatesenv
+# export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
 
 # Launch the filtering pipeline
 python "$ROOT/commands/run_filter.py" \
@@ -24,6 +24,6 @@ python "$ROOT/commands/run_filter.py" \
   --kernel-size-nan 1 \
   --step-to-crop-at-edges 0 \
   --untrustable-hs 40.0 \
-  --max-files 1 \
+  --max-files 10 \
   "$@"
 
