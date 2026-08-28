@@ -17,7 +17,6 @@ python "$ROOT/commands/run_filter.py" \
   --swot-root "$SWOT_ROOT" \
   --imerg-root "$IMERG_ROOT" \
   --output-dir "$OUTPUT_DIR" \
-  "${DATE_ARGS[@]}" \
   --max-files 5 \
   --imerg-rain-threshold 0.1 \
   --scale-MAD 5.0 \
