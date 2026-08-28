@@ -117,3 +117,29 @@ def select_swot_files_by_date(
         selected.append(path)
 
     return selected
+
+
+def month_date_bounds(year: int, month: int) -> tuple[str, str]:
+    """Return inclusive UTC calendar bounds ``(start, end)`` for one month."""
+    if not 1 <= month <= 12:
+        raise ValueError(f"month must be 1–12, got {month}")
+    start = f"{year:04d}-{month:02d}-01"
+    if month == 12:
+        next_month = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        next_month = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+    last_day = (next_month - timedelta(days=1)).day
+    end = f"{year:04d}-{month:02d}-{last_day:02d}"
+    return start, end
+
+
+def parse_month_arg(value: str) -> tuple[int, int, str, str]:
+    """
+    Parse ``YYYY-MM`` and return ``(year, month, start_date, end_date)``.
+    """
+    m = re.fullmatch(r"(\d{4})-(\d{2})", value.strip())
+    if not m:
+        raise ValueError(f"Expected YYYY-MM, got {value!r}")
+    year, month = int(m.group(1)), int(m.group(2))
+    start, end = month_date_bounds(year, month)
+    return year, month, start, end

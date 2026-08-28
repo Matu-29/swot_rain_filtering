@@ -630,20 +630,21 @@ def format_ds_swot(ds_swot, lon_map_min, lon_map_max, lat_map_min, lat_map_max, 
     for i in range(nlines):
         i0 = max(0, i - W)
         i1 = min(nlines, i + W + 1)
-    
+
         local_window = swh_karin_raw[i0:i1, :]
-    
+
+        # Skip empty windows (e.g. after bulldozer mask) — avoids All-NaN
+        # nanmedian warnings and wasted work on every along-track row.
+        if not np.isfinite(local_window).any():
+            continue
+
         hsmed = np.nanmedian(local_window)
-        #print(f"hs_med = {round(hsmed,2)} m")
-        
 
         local_mad = np.nanmedian(np.abs(local_window - hsmed))
 
-        #print(f"################ local_mad = {round(local_mad,2)} m")
-        
-        if np.isnan(hsmed):
+        if np.isnan(hsmed) or np.isnan(local_mad):
             continue
-    
+
         mask_x = np.abs(swh_karin_diff_x[i, :]) >= scale_MAD*local_mad # n fois le MAD, genre 3*MAD # avant: coef_hs_untrustable * hsmed
         mask_y = np.abs(swh_karin_diff_y[i, :]) >= scale_MAD*local_mad # n fois le MAD, genre 3*MAD # avant: coef_hs_untrustable * hsmed
     
