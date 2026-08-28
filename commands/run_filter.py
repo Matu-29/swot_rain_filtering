@@ -54,6 +54,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Process at most N files (sorted), useful for quick tests",
     )
+    p.add_argument(
+        "--start-date",
+        default=None,
+        help="Keep passes with start time on/after this date (YYYY-MM-DD or YYYYMMDD, UTC)",
+    )
+    p.add_argument(
+        "--end-date",
+        default=None,
+        help="Keep passes with start time on/before this date (YYYY-MM-DD or YYYYMMDD, UTC)",
+    )
     p.add_argument("--overwrite", action="store_true", help="Overwrite existing outputs")
     p.add_argument(
         "--no-fine-scale",
@@ -130,6 +140,8 @@ def main(argv: list[str] | None = None) -> int:
         args.swot_root,
         args.output_dir,
         pattern=args.pattern,
+        start_date=args.start_date,
+        end_date=args.end_date,
         overwrite=args.overwrite,
         max_files=args.max_files,
         inplace=args.inplace,

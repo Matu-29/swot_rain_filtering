@@ -7,11 +7,17 @@ SWOT_ROOT="/home/datawork-WW3/PROJECT/AMPHITRITE/SWOT/2025/SWOT_L2_KARIN_LR_Wind
 IMERG_ROOT="/home/datawork-cersat-project/pimep/data/imerg/gpm_3imerghhl/v7b"
 OUTPUT_DIR="/home/datawork-WW3/PROJECT/AMPHITRITE/SWOT_RAIN_FILTERED/"
 
+# Optional: restrict to passes whose start time falls in this UTC date range (inclusive)
+START_DATE="2025-03-01"
+END_DATE="2025-03-31"
+
 # Write to a separate folder (safe default):
 python "$ROOT/commands/run_filter.py" \
   --swot-root "$SWOT_ROOT" \
   --imerg-root "$IMERG_ROOT" \
   --output-dir "$OUTPUT_DIR" \
+  --start-date "$START_DATE" \
+  --end-date "$END_DATE" \
   --imerg-rain-threshold 0.1 \
   --scale-MAD 5.0 \
   --window-size 60 \

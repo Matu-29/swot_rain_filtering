@@ -635,6 +635,7 @@ def format_ds_swot(ds_swot, lon_map_min, lon_map_max, lat_map_min, lat_map_max, 
     
         hsmed = np.nanmedian(local_window)
         #print(f"hs_med = {round(hsmed,2)} m")
+        
 
         local_mad = np.nanmedian(np.abs(local_window - hsmed))
 

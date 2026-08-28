@@ -93,6 +93,8 @@ Set these in the bash launchers (or pass them to `run_filter.py`):
 | `--no-native-filtering` | Do not keep only `swh_karin_qual == 0` | flag |
 | `--remove-rain` | Apply SWOT `rain_flag` | flag |
 | `--max-files` | Maximum of files to process|
+| `--start-date` | Pass start time on/after this date (UTC, inclusive) | `2025-03-01` |
+| `--end-date` | Pass start time on/before this date (UTC, inclusive) | `2025-03-31` |
 | `--inplace` | Modify files in place instead of saving them in another folder |
 
 ## Library overview
@@ -100,7 +102,7 @@ Set these in the bash launchers (or pass them to `run_filter.py`):
 - `rain_tools` — IMERG file lookup, read, plot
 - `swot_tools` — SWOT I/O, maps, `format_ds_swot`
 - `pipeline` — `filter_one_pass` / `filter_directory`
-- `io` — SWOT filename time parsing
+- `io` — SWOT filename time parsing, date-range file selection
 
 ## Authors / context
 

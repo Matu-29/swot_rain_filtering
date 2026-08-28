@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from . import rain_tools as rt
 from . import swot_tools as st
+from .io import select_swot_files_by_date
 
 
 def filter_one_pass(
@@ -131,6 +132,8 @@ def filter_directory(
     output_dir: str | Path | None = None,
     *,
     pattern: str = "*.nc",
+    start_date: str | None = None,
+    end_date: str | None = None,
     overwrite: bool = False,
     max_files: int | None = None,
     inplace: bool = False,
@@ -141,6 +144,7 @@ def filter_directory(
 
     Writes one file per input into ``output_dir`` (same basename), unless
     ``inplace=True`` (then each input file is overwritten).
+    Optional ``start_date`` / ``end_date`` filter on pass start time (UTC).
     If ``max_files`` is set, only the first N sorted matches are processed.
     Returns the list of output paths successfully written.
     """
@@ -151,7 +155,20 @@ def filter_directory(
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-    files = sorted(swot_root.glob(pattern))
+    all_files = sorted(swot_root.glob(pattern))
+    if start_date is not None or end_date is not None:
+        files = select_swot_files_by_date(
+            all_files,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        print(
+            f"Date filter [{start_date or '...'} → {end_date or '...'}]: "
+            f"{len(files)}/{len(all_files)} file(s) selected"
+        )
+    else:
+        files = all_files
+
     if max_files is not None:
         files = files[: max(0, max_files)]
     written: list[Path] = []
