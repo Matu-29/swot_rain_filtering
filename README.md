@@ -70,6 +70,29 @@ Edit paths / thresholds inside the bash files, then, run the command:
 bash commands/run_default.sh
 ```
 
+Or run one calendar month (CERSAT + gap mirror, output under `OUTPUT_BASE/YYYY/MM/`):
+
+```bash
+bash commands/run_month.sh 2025 3
+bash commands/run_month.sh 2025 3 --no-fine-scale   # faster bulldozer-only pass
+```
+
+Submit a single-month test (January 2025):
+
+```bash
+bash commands/submit_january_2025_test.sh
+# quick test with only 3 files:
+MAX_FILES=3 bash commands/submit_january_2025_test.sh
+```
+
+Submit 12 separate PBS jobs for 2025:
+
+```bash
+bash commands/submit_2025_months.sh
+# or only Q1:
+MONTHS="1 2 3" bash commands/submit_2025_months.sh
+```
+
 Or call the Python entrypoint directly:
 
 ```bash
@@ -95,6 +118,9 @@ Set these in the bash launchers (or pass them to `run_filter.py`):
 | `--max-files` | Maximum of files to process|
 | `--start-date` | Pass start time on/after this date (UTC, inclusive) | `2025-03-01` |
 | `--end-date` | Pass start time on/before this date (UTC, inclusive) | `2025-03-31` |
+| `--month` | One calendar month (`YYYY-MM`) | `2025-03` |
+| `--skip-existing` | Skip outputs that already exist | flag |
+| `--failure-log` | Path for failed/warned files log | `OUTPUT_DIR/filter_failures.log` |
 | `--inplace` | Modify files in place instead of saving them in another folder |
 
 ## Library overview
@@ -106,5 +132,6 @@ Set these in the bash launchers (or pass them to `run_filter.py`):
 
 ## Authors / context
 
-Original code: Matu
+Original code + scientific development: Matu
+Codebase reorganization + help for testing: Inès
 

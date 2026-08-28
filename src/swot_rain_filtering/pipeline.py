@@ -130,13 +130,19 @@ def filter_one_pass(
     if imerg_root is not None:
         imerg_kwargs["imerg_root"] = Path(imerg_root)
 
+    ds_swot = None
     try:
         ds_swot = xr.open_dataset(swot_path)
     except Exception as exc:
         return FilterOutcome(swot_path, "swot_open_error", str(exc))
 
     try:
-        ds_swot, t_start_str, t_end_str = st.quick_format_ds_swot(ds_swot)
+        try:
+            ds_swot, t_start_str, t_end_str = st.quick_format_ds_swot(ds_swot)
+        except (AttributeError, TypeError, ValueError) as exc:
+            reason = f"quick_format_ds_swot: {exc}"
+            print(f"[WARN] {swot_path.name}: {reason}")
+            return FilterOutcome(swot_path, "swot_format_error", reason)
 
         lon_min = float(np.nanmin(ds_swot.longitude.values))
         lon_max = float(np.nanmax(ds_swot.longitude.values))
@@ -215,12 +221,18 @@ def filter_one_pass(
             ds_out = ds_swot.load()
             ds_swot.close()
             ds_swot = None
-            if out.resolve() == swot_path.resolve():
-                tmp = out.with_name(out.name + ".tmp")
-                ds_out.to_netcdf(tmp)
-                tmp.replace(out)
-            else:
-                ds_out.to_netcdf(out)
+            try:
+                if out.resolve() == swot_path.resolve():
+                    tmp = out.with_name(out.name + ".tmp")
+                    ds_out.to_netcdf(tmp)
+                    tmp.replace(out)
+                else:
+                    ds_out.to_netcdf(out)
+            except Exception as exc:
+                ds_out.close()
+                reason = f"write_error: {exc}"
+                print(f"[WARN] {swot_path.name}: {reason}")
+                return FilterOutcome(swot_path, "write_error", reason, output_path=out)
             ds_out.close()
 
             status = "ok_with_warnings" if fine_scale_warning else "ok"
@@ -228,6 +240,10 @@ def filter_one_pass(
 
         status = "ok_with_warnings" if fine_scale_warning else "ok"
         return FilterOutcome(swot_path, status, fine_scale_warning)
+    except Exception as exc:
+        reason = str(exc)
+        print(f"[WARN] {swot_path.name}: {reason}")
+        return FilterOutcome(swot_path, "filter_error", reason)
     finally:
         if ds_swot is not None:
             ds_swot.close()
@@ -272,12 +288,17 @@ def filter_file_list(
             )
             continue
 
-        outcome = filter_one_pass(
-            swot_file,
-            output_path=out,
-            overwrite=overwrite or inplace,
-            **filter_kwargs,
-        )
+        try:
+            outcome = filter_one_pass(
+                swot_file,
+                output_path=out,
+                overwrite=overwrite or inplace,
+                **filter_kwargs,
+            )
+        except Exception as exc:
+            reason = str(exc)
+            print(f"[WARN] {swot_file.name}: unexpected error: {reason}")
+            outcome = FilterOutcome(swot_file, "filter_error", reason)
         result.outcomes.append(outcome)
         if outcome.ok:
             result.written.append(out)
