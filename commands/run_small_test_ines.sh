@@ -11,20 +11,7 @@ OUTPUT_DIR="/home/datawork-WW3/PROJECT/AMPHITRITE/SWOT_RAIN_FILTERED/"
 START_DATE="2025-03-24"
 END_DATE="2025-03-24"
 
-# Avoid matplotlib error (Ines env)
-
-# source "$(conda info --base)/etc/profile.d/conda.sh"
-# conda activate seastatesenv
-# export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
-
 # Launch the filtering pipeline
-DATE_ARGS=()
-if [[ -n "${START_DATE:-}" ]]; then
-  DATE_ARGS+=(--start-date "$START_DATE")
-fi
-if [[ -n "${END_DATE:-}" ]]; then
-  DATE_ARGS+=(--end-date "$END_DATE")
-fi
 
 python "$ROOT/commands/run_filter.py" \
   --swot-root "$SWOT_ROOT" \
@@ -38,5 +25,7 @@ python "$ROOT/commands/run_filter.py" \
   --kernel-size-nan 1 \
   --step-to-crop-at-edges 0 \
   --untrustable-hs 40.0 \
+  --start-date 2025-04-28 \
+  --end-date 2025-04-28 \
   "$@"
 
