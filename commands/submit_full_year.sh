@@ -9,8 +9,9 @@
 set -euo pipefail # exit on error
 ROOT="$(cd "$(dirname "$0")/.." && pwd)" # root directory of the project
 YEAR="${YEAR:-2025}" # year to process
-MONTHS="${MONTHS:-1 2 3 4 5 6 7 8 9 10 11 12}" # months to process
-WALLTIME="${WALLTIME:-08:00:00}" # walltime
+#MONTHS="${MONTHS:-2 3 4 5 6}" # months to process
+MONTHS="${MONTHS:-7 8 9 10 11 12}"
+WALLTIME="${WALLTIME:-04:00:00}" # walltime
 MEM="${MEM:-8gb}" # memory
 NCPUS="${NCPUS:-1}" # number of CPUs
 QUEUE="${QUEUE:-}" # I leave it empty to use the default queue
