@@ -134,6 +134,7 @@ def filter_one_pass(
     untrustable_hs: float = 40.0,
     native_filtering: bool = True,
     remove_rain: bool = False,
+    already_flipped: bool = False,
     apply_fine_scale: bool = True,
     output_path: str | Path | None = None,
     overwrite: bool = False,
@@ -158,7 +159,10 @@ def filter_one_pass(
     # Try to format the SWOT file.
     try:
         try:
-            ds_swot, t_start_str, t_end_str = st.quick_format_ds_swot(ds_swot)
+            ds_swot, t_start_str, t_end_str = st.quick_format_ds_swot(ds_swot)     # Warning, by doing this, we must be aware that we must not redo 
+            # ds_swot.coords["longitude"] = (ds_swot.coords["longitude"] + 180) % 360 - 180 by error with the function st.format_ds_swot.
+            # therefore, we set the parameter already_flipped = True to prevent this from happening when performing the fine_scale_filter, using st.format_ds_swot.
+            already_flipped = True
         except (AttributeError, TypeError, ValueError) as exc:
             reason = f"quick_format_ds_swot: {exc}"
             print(f"[WARN] {swot_path.name}: {reason}")
@@ -182,9 +186,7 @@ def filter_one_pass(
 
         # Read the IMERG file.
         try:
-            precip, lon_imerg, lat_imerg = rt.read_imerg_precip(
-                f_c, lon_min, lon_max, lat_min, lat_max
-            )
+            precip, lon_imerg, lat_imerg = rt.read_imerg_precip(f_c, lon_min, lon_max, lat_min, lat_max)
         
         # If an error occurs, record the failure and continue with the next file.
         except Exception as exc:
@@ -193,25 +195,23 @@ def filter_one_pass(
             return FilterOutcome(swot_path, "imerg_read_error", reason)
 
         # Regrid the IMERG data to the SWOT grid.
-        da_imerg = xr.DataArray(
-            precip, coords={"lat": lat_imerg, "lon": lon_imerg}, dims=["lat", "lon"]
-        )
-        da_regrid = da_imerg.interp(
-            lat=ds_swot.latitude, lon=ds_swot.longitude, method="linear"
-        )
+        da_imerg = xr.DataArray(precip, coords={"lat": lat_imerg, "lon": lon_imerg}, dims=["lat", "lon"])
+        da_regrid = da_imerg.interp(lat=ds_swot.latitude, lon=ds_swot.longitude, method="linear")
 
         # Create the bulldozer mask.
         ds_swot["IMERG_rain_rate"] = (("num_lines", "num_pixels"), da_regrid.data)
-        ds_swot["bulldozer_mask"] = (
-            ("num_lines", "num_pixels"),
-            (da_regrid.data > imerg_rain_threshold).astype(int),
-        )
+        ds_swot["bulldozer_mask"] = (("num_lines", "num_pixels"), (da_regrid.data > imerg_rain_threshold).astype(int))
 
         # Create the fine-scale filter mask.
         fine_scale_warning = ""
         if apply_fine_scale:
             ds_bulldozered = ds_swot.where(ds_swot.bulldozer_mask == 0)
             try:
+                # ATTENTION, le fait de faire ça provoque un double changement des coordonnées en longitude.
+                # Ajout du paramètre "already_flipped=True", pour spécifier que la ligne
+                # ds_swot.coords["longitude"] = (ds_swot.coords["longitude"] + 180) % 360 - 180
+                # de la fonction quick_format_ds_swot a déjà eu lieu
+
                 # Format the SWOT file for the fine-scale filter.
                 ds_fine, _, _ = st.format_ds_swot(
                     ds_bulldozered,
@@ -226,12 +226,10 @@ def filter_one_pass(
                     remove_rain=remove_rain,
                     window_size=window_size,
                     native_filtering=native_filtering,
+                    already_flipped=already_flipped
                 )
                 # Create the fine-scale filter mask.
-                ds_swot["fine_scale_filter_mask"] = (
-                    ("num_lines", "num_pixels"),
-                    ds_fine.fine_scale_filter.data,
-                )
+                ds_swot["fine_scale_filter_mask"] = (("num_lines", "num_pixels"), ds_fine.fine_scale_filter.data)
             # If an error occurs, record the failure and continue with the next file.
             except (AttributeError, ValueError) as exc:
                 fine_scale_warning = f"fine_scale_filter_failed: {exc}"
@@ -242,12 +240,7 @@ def filter_one_pass(
             # Check if the output file already exists.
             out = Path(output_path)
             if out.exists() and not overwrite and out.resolve() != swot_path.resolve():
-                return FilterOutcome(
-                    swot_path,
-                    "output_exists",
-                    f"Output exists (use --overwrite): {out}",
-                    output_path=out,
-                )
+                return FilterOutcome(swot_path, "output_exists", f"Output exists (use --overwrite): {out}", output_path=out)
             out.parent.mkdir(parents=True, exist_ok=True)
 
             # Load the SWOT file.
@@ -323,19 +316,12 @@ def filter_file_list(
         # If the output file already exists
         # skip it unless we are overwriting.
         if skip_existing and not overwrite and out.exists():
-            result.outcomes.append(
-                FilterOutcome(swot_file, "skipped_existing", output_path=out)
-            )
+            result.outcomes.append(FilterOutcome(swot_file, "skipped_existing", output_path=out))
             continue
 
         # Try to filter the SWOT file.
         try:
-            outcome = filter_one_pass(
-                swot_file,
-                output_path=out,
-                overwrite=overwrite or inplace,
-                **filter_kwargs,
-            )
+            outcome = filter_one_pass(swot_file, output_path=out, overwrite=overwrite or inplace, **filter_kwargs)
 
         # If an error occurs, record the failure 
         # and continue with the next file.
@@ -400,11 +386,7 @@ def filter_directory(
     # Apply the date filter if provided 
     # (only select files within the date range)
     if start_date is not None or end_date is not None:
-        files = select_swot_files_by_date(
-            all_files,
-            start_date=start_date,
-            end_date=end_date,
-        )
+        files = select_swot_files_by_date(all_files, start_date=start_date, end_date=end_date)
         print(
             f"Date filter [{start_date or '...'} → {end_date or '...'}]: "
             f"{len(files)}/{len(all_files)} file(s) selected"
