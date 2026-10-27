@@ -20,7 +20,7 @@ from swot_rain_filtering.pipeline import filter_directory, filter_file_list, fil
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Apply IMERG bulldozer + Matu fine-scale rain filter to SWOT L2 files."
+        description="Apply IMERG bulldozer + Matu fine-scale rain filter to SWOT L2 or L3 (--l3) files."
     )
     p.add_argument(
         "--swot-root",
@@ -117,6 +117,21 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Do not restrict to swh_karin_qual == 0",
     )
     p.add_argument(
+        "--l3",
+        action="store_true",
+        help="Input is SWOT L3 WindWave: read the 'swh2d' group (no swh_karin_qual, use --no-native-filtering)",
+    )
+    p.add_argument(
+        "--group",
+        default=None,
+        help="NetCDF group to read (overrides --l3; default: root group for L2, 'swh2d' with --l3)",
+    )
+    p.add_argument(
+        "--compress",
+        action="store_true",
+        help="Compress outputs (zlib, int8 masks, float32 IMERG rain rate)",
+    )
+    p.add_argument(
         "--remove-rain",
         action="store_true",
         help="Also apply SWOT rain_flag == 0",
@@ -140,6 +155,11 @@ def main(argv: list[str] | None = None) -> int:
         print("Provide --output-dir, or use --inplace to overwrite inputs.", file=sys.stderr)
         return 2
 
+    group = args.group or ("swh2d" if args.l3 else None)
+    if group is not None and args.inplace:
+        print("--inplace is not supported when reading a NetCDF group (would drop the other groups).", file=sys.stderr)
+        return 2
+
     filter_kwargs = {
         "imerg_root": args.imerg_root,
         "imerg_rain_threshold": args.imerg_rain_threshold,
@@ -151,6 +171,8 @@ def main(argv: list[str] | None = None) -> int:
         "native_filtering": not args.no_native_filtering,
         "remove_rain": args.remove_rain,
         "apply_fine_scale": not args.no_fine_scale,
+        "group": group,
+        "compress": args.compress,
     }
     if filter_kwargs["imerg_root"] is None:
         del filter_kwargs["imerg_root"]

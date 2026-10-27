@@ -58,6 +58,25 @@ def _add_features(ax):
     #ax.set_extent([LON_MIN, LON_MAX, LAT_MIN, LAT_MAX], crs=ccrs.PlateCarree())
 
 
+SWOT_TIME_EPOCH = np.datetime64("2000-01-01T00:00:00", "ns")
+
+def decode_swot_time(ds_swot):
+    """
+    Convert SWOT time to datetime64 if xarray did not decode it.
+    L3 files have no 'units' attribute on time: values are float seconds since 2000-01-01 UTC.
+    L2 files are already decoded by xarray (returned unchanged).
+    """
+    if np.issubdtype(ds_swot.time.dtype, np.datetime64):
+        return ds_swot
+    seconds = ds_swot.time.values.astype("float64")
+    valid = np.isfinite(seconds)
+    decoded = np.full(seconds.shape, np.datetime64("NaT", "ns"))
+    decoded[valid] = SWOT_TIME_EPOCH + (seconds[valid] * 1e9).astype("timedelta64[ns]")
+    attrs = {k: v for k, v in ds_swot.time.attrs.items() if k != "_FillValue"}
+    ds_swot["time"] = (ds_swot.time.dims, decoded, attrs)
+    return ds_swot
+
+
 def quick_format_ds_swot(ds_swot, area = [-180, 180, -90, 90], already_flipped=False):
     lon_map_min, lon_map_max, lat_map_min, lat_map_max = [area[i] for i in range(4)]
     if not already_flipped:
@@ -110,12 +129,32 @@ def open_swot(swot_nc_path, lon_map_min=-180, lon_map_max=180, lat_map_min=-90, 
 ###########################################
     
 
+def find_swath_bands(swh):
+    """
+    First and last column (inclusive) of each contiguous band of columns holding data.
+
+    A column holds data if it has at least one finite, non-zero value. The column
+    mask is padded with an empty column on each side, so a band touching column 0
+    or the last column is still found (this happens in some L3 files; in L2 the
+    outer columns are always empty).
+    Returns (start_idxs, end_idxs); normally 2 bands (left and right swath).
+    """
+    swh = np.asarray(swh, dtype=float)
+    has_data = np.any(np.isfinite(swh) & (swh != 0), axis=0).astype(int)
+    transitions = np.diff(np.concatenate(([0], has_data, [0])))
+    start_idxs = np.where(transitions == 1)[0]
+    end_idxs = np.where(transitions == -1)[0] - 1
+    return start_idxs, end_idxs
+
+
 def format_ds_swot(ds_swot, lon_map_min, lon_map_max, lat_map_min, lat_map_max, scale_MAD=2.5, untrustable_hs=40, kernel_size_nan=7, step_to_crop_at_edges=2,remove_rain=True, coef_hs_untrustable = 0.3, window_size=60,native_filtering=True, already_flipped=False):
     if not already_flipped:
         ds_swot.coords['longitude'] = (ds_swot.coords['longitude'] + 180) % 360 - 180
     ## On réduit la zone de SWOT à celle de la région choisie
     ds_swot = ds_swot.where((ds_swot.longitude >= lon_map_min) & (ds_swot.longitude <= lon_map_max) & (ds_swot.latitude >= lat_map_min) & (ds_swot.latitude <= lat_map_max), drop=False)
-    ds_swot = ds_swot.where(ds_swot.notnull().any(dim=["num_pixels", "num_sides"]))# drop=True) # on vire les rows où y a que des nan, mais on garde toutes les colonnes, sinon après c'est le zbeul pour s'y retrouver (on garde 69 valeurs en mode SWOT standard) === update non sinon c'est relou
+    # L3 has no num_sides dimension: only use the dims present in the file
+    row_dims = [d for d in ("num_pixels", "num_sides") if d in ds_swot.dims]
+    ds_swot = ds_swot.where(ds_swot.notnull().any(dim=row_dims))# drop=True) # on vire les rows où y a que des nan, mais on garde toutes les colonnes, sinon après c'est le zbeul pour s'y retrouver (on garde 69 valeurs en mode SWOT standard) === update non sinon c'est relou
     
     ### Formatting swot track times for plots
     
@@ -144,7 +183,11 @@ def format_ds_swot(ds_swot, lon_map_min, lon_map_max, lat_map_min, lat_map_max, 
     
     # Correction des valeurs de HS de mauvaise qualité
     if native_filtering:
-        ds_swot = ds_swot.where(ds_swot.swh_karin_qual == 0)
+        if "swh_karin_qual" in ds_swot:
+            ds_swot = ds_swot.where(ds_swot.swh_karin_qual == 0)
+        else:
+            # L3: quality filtering was already applied upstream, no flag in the file
+            print("[INFO] swh_karin_qual not found: skipping native filtering (already applied in L3)")
     if remove_rain:
         # On retire les zones de pluie
         ds_swot = ds_swot.where(ds_swot.rain_flag == 0)
@@ -155,13 +198,11 @@ def format_ds_swot(ds_swot, lon_map_min, lon_map_max, lat_map_min, lat_map_max, 
     # FILTERING UNFILTERED RAIN OR BUMPS IN HS CLEARLY NOT PHYSICAL #
     #################################################################
 
-    columns_not_fully_nan = np.argwhere(np.nansum(ds_swot.swh_karin.values,axis=0) !=0) 
-    summed_columns_zero_or_non_zero = np.nansum(ds_swot.swh_karin.values,axis=0) != 0
-    transitions = np.diff(summed_columns_zero_or_non_zero.astype(int))
-    
-    start_idxs = np.where(transitions == 1)[0] + 1  # add 1 because diff shifts by one
-    end_idxs = np.where(transitions == -1)[0]       # these are already at the right place
-    
+    start_idxs, end_idxs = find_swath_bands(ds_swot.swh_karin.values)
+    if len(start_idxs) != 2:
+        print(f"[WARN] {len(start_idxs)} swath band(s) found instead of 2 "
+              f"(start={start_idxs.tolist()}, end={end_idxs.tolist()}) for {t_ini_swot} --- {t_end_swot}")
+
     ### Print the corresponding values 
     #print("Start values:", summed_columns_zero_or_non_zero[start_idxs])
     #print("End values:", summed_columns_zero_or_non_zero[end_idxs])
@@ -181,13 +222,10 @@ def format_ds_swot(ds_swot, lon_map_min, lon_map_max, lat_map_min, lat_map_max, 
     swh_karin_diff_x = np.nan*np.ones(swh_karin_raw.shape)
     swh_karin_diff_y = np.nan*np.ones(swh_karin_raw.shape)
     
-    for i in range(2):
-        try:
-            swh_karin_diff_x[:, start_idxs[i] + 1 : end_idxs[i] - 1] = swh_karin_raw[:,start_idxs[i] + 2 : end_idxs[i]] - swh_karin_raw[:,start_idxs[i] : end_idxs[i] - 2]
-            swh_karin_diff_y[1:-1,:] = swh_karin_raw[2:,:] - swh_karin_raw[:-2,:]
-        except IndexError:
-            print(f"ERROR FOR SWOT PATH ASSOCIATED TO {t_ini_swot} --- {t_end_swot}")
-            pass
+    # Across-track differences inside each swath band (never across the nadir gap)
+    for start, end in zip(start_idxs, end_idxs):
+        swh_karin_diff_x[:, start + 1 : end - 1] = swh_karin_raw[:, start + 2 : end] - swh_karin_raw[:, start : end - 2]
+    swh_karin_diff_y[1:-1,:] = swh_karin_raw[2:,:] - swh_karin_raw[:-2,:]
 
     nlines = swh_karin_raw.shape[0]
     
@@ -497,7 +535,7 @@ def find_cycle_and_pass_from_L2_LR_SSH(ds_swot=None, swot_path=None):
     return cycle, n_pass
 
 
-def add_swot_path_to_ines_cases_locations(df_locations=pd.read_csv(r"/home1/datahome/ilarroch/data/INES/CODE/swot_rain_filtering/ines_swot_cases.csv")):
+def add_swot_path_to_ines_cases_locations(df_locations):
     selected_swot_paths_list = []
     
     for i in range(len(df_locations)):

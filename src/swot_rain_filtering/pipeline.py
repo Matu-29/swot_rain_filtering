@@ -122,6 +122,26 @@ def write_filter_run_log(
     print(f"Run log: {log_path} ({len(failed)} failed, {len(warned)} warning(s))")
 
 
+# Output dtypes used when compressing (masks are 0/1, rain rate does not need float64)
+_COMPRESSED_DTYPES = {
+    "bulldozer_mask": "int8",
+    "fine_scale_filter_mask": "int8",
+    "IMERG_rain_rate": "float32",
+}
+
+
+def _set_compression(ds: xr.Dataset, complevel: int = 4) -> None:
+    """Enable zlib compression on every variable (in place, through ``.encoding``)."""
+    for name, var in ds.variables.items():
+        if var.dtype.kind in ("S", "U", "O"):
+            continue
+        # Contiguous storage is incompatible with compression
+        var.encoding.pop("contiguous", None)
+        var.encoding.update(zlib=True, complevel=complevel)
+        if name in _COMPRESSED_DTYPES:
+            var.encoding["dtype"] = _COMPRESSED_DTYPES[name]
+
+
 def filter_one_pass(
     swot_path: str | Path,
     *,
@@ -136,11 +156,16 @@ def filter_one_pass(
     remove_rain: bool = False,
     already_flipped: bool = False,
     apply_fine_scale: bool = True,
+    group: str | None = None,
+    compress: bool = False,
     output_path: str | Path | None = None,
     overwrite: bool = False,
 ) -> FilterOutcome:
     """
     Apply IMERG bulldozer filter (and optional fine-scale filter) to one SWOT file.
+
+    ``group``: NetCDF group to read (``"swh2d"`` for SWOT L3, ``None`` for L2).
+    ``compress``: write a compressed output (zlib, int8 masks, float32 rain rate).
 
     Returns a :class:`FilterOutcome` describing success or failure.
     """
@@ -152,7 +177,9 @@ def filter_one_pass(
 
     ds_swot = None
     try:
-        ds_swot = xr.open_dataset(swot_path)
+        ds_swot = xr.open_dataset(swot_path, group=group)
+        # L3 time is not decoded by xarray (no units): convert it here
+        ds_swot = st.decode_swot_time(ds_swot)
     except Exception as exc:
         return FilterOutcome(swot_path, "swot_open_error", str(exc))
 
@@ -248,6 +275,8 @@ def filter_one_pass(
             ds_swot.close()
             ds_swot = None
             try:
+                if compress:
+                    _set_compression(ds_out)
                 if out.resolve() == swot_path.resolve():
                     tmp = out.with_name(out.name + ".tmp")
                     ds_out.to_netcdf(tmp)
